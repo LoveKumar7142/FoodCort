@@ -1,265 +1,201 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 import { GiForkKnifeSpoon } from "react-icons/gi";
 import { AiOutlineShoppingCart, AiOutlineSearch } from "react-icons/ai";
+import { IoLocationSharp } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
+import useGetCity from "../../hooks/useGetCity";
 
 const UserDashboard = () => {
   const navigate = useNavigate();
-  const { userData } = useSelector((state) => state.user);
-  const [cart, setCart] = useState([]);
-  const [items, setItems] = useState([]);
-  const [search, setSearch] = useState("");
+  const { userData, city } = useSelector((state) => state.user);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showCart, setShowCart] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [search, setSearch] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640); // ✅ added for responsive check
 
+  const profileRef = useRef(null);
+  const searchRef = useRef(null);
+
+  // Detect user location
+  useGetCity();
+
+  // ✅ Detect resize to toggle mobile view
   useEffect(() => {
-    const sampleItems = [
-      {
-        id: 1,
-        name: "Pizza Margherita",
-        price: 8,
-        offer: "10% off",
-        image: "https://source.unsplash.com/400x300/?pizza",
-      },
-      {
-        id: 2,
-        name: "Burger Deluxe",
-        price: 5,
-        offer: "Buy 1 Get 1",
-        image: "https://source.unsplash.com/400x300/?burger",
-      },
-      {
-        id: 3,
-        name: "Pasta Alfredo",
-        price: 7,
-        offer: "20% off",
-        image: "https://source.unsplash.com/400x300/?pasta",
-      },
-      {
-        id: 4,
-        name: "Sushi Platter",
-        price: 12,
-        offer: "Special Combo",
-        image: "https://source.unsplash.com/400x300/?sushi",
-      },
-    ];
-    setItems(sampleItems);
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const handleAddToCart = (item) => {
-    const exist = cart.find((i) => i.id === item.id);
-    if (exist) {
-      setCart(
-        cart.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i))
-      );
-    } else {
-      setCart([...cart, { ...item, qty: 1 }]);
-    }
-  };
+  // ✅ Hide dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfileMenu(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowMobileSearch(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
-  const handleQtyChange = (id, delta) => {
-    setCart((prevCart) =>
-      prevCart
-        .map((i) => {
-          if (i.id === id) {
-            const newQty = i.qty + delta;
-            if (newQty <= 0) return null;
-            return { ...i, qty: newQty };
-          }
-          return i;
-        })
-        .filter(Boolean)
-    );
-  };
-
-  const filteredItems = items.filter((item) =>
-    item.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const totalItems = cart.reduce((acc, curr) => acc + curr.qty, 0);
-  const totalPrice = cart.reduce((acc, curr) => acc + curr.price * curr.qty, 0);
-
-  const handleSignOut = () => {
-    localStorage.removeItem("user");
-    window.location.reload();
-  };
+  // ✅ Hide search bar on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (showMobileSearch) {
+        setShowMobileSearch(false);
+        setSearch("");
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [showMobileSearch]);
 
   return (
-    <div className="min-h-screen bg-orange-50">
+    <>
       {/* Navbar */}
-      <nav className="bg-white shadow-lg p-4 flex justify-between items-center relative">
-        <div className="flex items-center gap-2">
+      <nav className="bg-white shadow-md px-4 py-3 flex justify-between items-center sticky top-0 z-50">
+        {/* Logo */}
+        <div
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={() => navigate("/")}
+        >
           <GiForkKnifeSpoon className="text-orange-500 text-3xl" />
           <span className="text-2xl font-bold text-orange-500">FoodCort</span>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Search */}
-          <div className="relative hidden sm:block">
+        {/* Desktop Search */}
+        <div className="hidden sm:flex items-center bg-gray-50 gap-2 px-10 py-2 rounded-xl hover:ring-2 hover:ring-orange-400 transition">
+          <IoLocationSharp className="text-orange-500 text-lg mr-0.5" />
+          <span className="font-medium text-gray-700">
+            {city || "Detecting..."}
+          </span>
+          <span className="mx-3 text-gray-400">|</span>
+          <div className="flex items-center">
+            <AiOutlineSearch className="text-gray-500 mr-1" />
             <input
               type="text"
               placeholder="Search food..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border rounded-xl py-1 px-3 outline-none focus:ring-2 focus:ring-orange-400 w-48 sm:w-60"
+              className="bg-transparent outline-none text-sm w-48 sm:w-56"
             />
-            <AiOutlineSearch className="absolute right-2 top-1.5 text-gray-400" />
           </div>
+        </div>
 
-          {/* Cart */}
-          <div
-            className="relative cursor-pointer"
-            onClick={() => cart.length > 0 && navigate("/cart")}
-          >
-            <AiOutlineShoppingCart className="text-2xl text-orange-500" />
-            {totalItems > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                {totalItems}
-              </span>
-            )}
-          </div>
+        {/* Right Section */}
+        <div className="flex items-center gap-4">
+          {/* Mobile Search Icon */}
+          <AiOutlineSearch
+            className="text-2xl text-orange-500 sm:hidden cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMobileSearch((prev) => !prev);
+            }}
+          />
+
+          {/* ✅ Cart Icon (only visible in Desktop view) */}
+          {!isMobile && (
+            <div
+              className="relative cursor-pointer"
+              onClick={() => navigate("/cart")}
+            >
+              <AiOutlineShoppingCart className="text-2xl text-orange-500" />
+            </div>
+          )}
 
           {/* Profile */}
-          <div className="relative">
+          <div className="relative" ref={profileRef}>
             <div
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center cursor-pointer font-bold text-lg"
             >
-              {userData?.fullName?.slice(0, 1).toUpperCase()}
+              {userData?.fullName?.slice(0, 1).toUpperCase() || "U"}
             </div>
 
-            <div
-              className={`absolute right-0 mt-2 w-44 bg-white shadow-lg rounded-xl p-2 z-50 transform transition-all duration-300 ease-out ${
-                showProfileMenu
-                  ? "opacity-100 translate-x-0"
-                  : "opacity-0 translate-x-2 pointer-events-none"
-              }`}
-            >
-              <p className="text-gray-800 font-medium px-2 py-1 border-b truncate">
-                {userData?.fullName}
-              </p>
-              <p className="text-gray-500 px-2 py-1 truncate">
-                {userData?.email}
-              </p>
-              <button
-                onClick={handleSignOut}
-                className="w-full text-left px-2 py-2 hover:bg-orange-100 rounded-xl"
-              >
-                Sign Out
-              </button>
-            </div>
+            {/* Profile Dropdown */}
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-2 w-52 bg-white shadow-lg rounded-xl p-3 z-[9999]">
+                <p className="text-gray-800 font-medium px-2 py-1 border-b truncate">
+                  {userData?.fullName || "User"}
+                </p>
+                <p className="text-gray-500 px-2 py-1 truncate">
+                  {userData?.email || "email@example.com"}
+                </p>
+
+                {/* Desktop Options */}
+                <div className="hidden sm:block border-t mt-2 pt-2">
+                  {/* <div
+                    onClick={() => navigate("/cart")}
+                    className="flex items-center gap-2 px-2 py-1 mt-1 cursor-pointer hover:bg-orange-50 rounded-lg"
+                  >
+                    <AiOutlineShoppingCart className="text-orange-500 text-lg" />
+                    <span className="text-gray-700 text-sm">My Cart</span>
+                  </div> */}
+
+                  <button
+                    onClick={() => console.log("Signout Clicked")}
+                    className="w-full bg-orange-500 text-white text-sm font-semibold py-1.5 rounded-lg mt-2 hover:bg-orange-600"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+
+                {/* ✅ Mobile Options */}
+                <div className="block sm:hidden border-t mt-2 pt-2">
+                  <div className="flex items-center gap-2 px-2 py-1">
+                    <IoLocationSharp className="text-orange-500" />
+                    <span className="text-gray-700 text-sm">
+                      {city || "Detecting..."}
+                    </span>
+                  </div>
+
+                  {/* ✅ Cart shown only in Mobile popup */}
+                  {isMobile && (
+                    <div
+                      onClick={() => navigate("/cart")}
+                      className="flex items-center gap-2 px-2 py-1 mt-1 cursor-pointer hover:bg-orange-50 rounded-lg"
+                    >
+                      <AiOutlineShoppingCart className="text-orange-500 text-lg" />
+                      <span className="text-gray-700 text-sm">My Cart</span>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => console.log("Signout Clicked")}
+                    className="w-full bg-orange-500 text-white text-sm font-semibold py-1.5 rounded-lg mt-2 hover:bg-orange-600"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </nav>
 
-      {/* Welcome */}
-      <div className="text-center my-6 px-4 sm:px-0">
-        <h2 className="text-3xl font-bold text-orange-500">
-          Hello, {userData?.fullName}!
-        </h2>
-        <p className="text-gray-700 mt-2">
-          Browse items and add them to your cart
-        </p>
-      </div>
-
-      {/* Items Grid */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
-        {filteredItems.map((item) => (
-          <div
-            key={item.id}
-            className="bg-white rounded-2xl shadow-md overflow-hidden hover:scale-105 transition-transform"
-          >
-            <img
-              src={item.image}
-              alt={item.name}
-              className="w-full h-40 object-cover"
+      {/* ✅ Mobile Search just below navbar */}
+      {showMobileSearch && (
+        <div
+          ref={searchRef}
+          className="bg-white shadow-md border-t border-gray-200 p-3 sticky top-[60px] z-40 sm:hidden"
+        >
+          <div className="flex items-center gap-2">
+            <AiOutlineSearch className="text-orange-500 text-xl" />
+            <input
+              type="text"
+              placeholder="Search your favorite food..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
+              autoFocus
             />
-            <div className="p-4">
-              <h3 className="font-semibold text-lg text-gray-800 truncate">
-                {item.name}
-              </h3>
-              <p className="text-orange-500 font-bold mt-1">${item.price}</p>
-              {item.offer && (
-                <p className="text-green-500 text-sm">{item.offer}</p>
-              )}
-
-              {/* Quantity */}
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  onClick={() => handleQtyChange(item.id, -1)}
-                  className="px-2 bg-gray-200 rounded"
-                >
-                  -
-                </button>
-                <span>{cart.find((i) => i.id === item.id)?.qty || 0}</span>
-                <button
-                  onClick={() => handleAddToCart(item)}
-                  className="px-2 bg-gray-200 rounded"
-                >
-                  +
-                </button>
-              </div>
-
-              <button
-                onClick={() => handleAddToCart(item)}
-                className="mt-3 w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-xl transition"
-              >
-                Add to Cart
-              </button>
-            </div>
           </div>
-        ))}
-      </div>
-
-      {/* Bottom bar */}
-      {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white shadow-t p-4 border-t border-gray-200 flex justify-between items-center sm:hidden">
-          <span className="font-bold text-gray-800">Total: ${totalPrice}</span>
-          <button
-            onClick={() => setShowCart(!showCart)}
-            className="bg-orange-500 hover:bg-orange-600 text-white py-1 px-4 rounded-xl transition"
-          >
-            {showCart ? "Hide Cart" : "View Cart"}
-          </button>
         </div>
       )}
-
-      {/* Cart popup */}
-      {cart.length > 0 && showCart && (
-        <div className="fixed bottom-16 right-4 w-80 sm:w-96 bg-white shadow-xl rounded-xl p-4 z-50 max-h-96 overflow-y-auto">
-          {cart.map((i) => (
-            <div
-              key={i.id}
-              className="flex justify-between items-center py-2 border-b border-gray-200"
-            >
-              <div>
-                <p className="font-medium truncate">{i.name}</p>
-                <p className="text-gray-500">
-                  ${i.price} x {i.qty} = ${i.price * i.qty}
-                </p>
-                {i.offer && <p className="text-green-500 text-sm">{i.offer}</p>}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleQtyChange(i.id, -1)}
-                  className="px-2 bg-gray-200 rounded"
-                >
-                  -
-                </button>
-                <span>{i.qty}</span>
-                <button
-                  onClick={() => handleQtyChange(i.id, 1)}
-                  className="px-2 bg-gray-200 rounded"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 

@@ -7,10 +7,12 @@ import Home from './pages/Home'
 import useGetCurrentUser from '../hooks/useGetCurrentUser'
 import { useSelector } from 'react-redux'
 import CartPage from './components/CartPage'
+import useGetCity from '../hooks/useGetCity'
 
 export const serverUrl = "http://localhost:5000"
 
 const App = () => {
+  useGetCity()
   useGetCurrentUser()
   const { userData } = useSelector(state => state.user)
 
